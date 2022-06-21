@@ -1,5 +1,9 @@
 arcgis==1.9.1
-matplotlib==3.5.2
-numpy==1.22.4
-pandas==1.4.2
-streamlit==1.10.0
+matplotlib
+numpy
+pandas
+seaborn
+streamlit
+geemap
+folium
+ipyleaflet
