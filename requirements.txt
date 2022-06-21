@@ -8,3 +8,4 @@ geemap
 folium
 ipyleaflet
 earthengine-api
+leafmap
