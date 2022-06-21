@@ -7,3 +7,4 @@ streamlit
 geemap
 folium
 ipyleaflet
+earthengine-api
