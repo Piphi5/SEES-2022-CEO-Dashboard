@@ -417,11 +417,11 @@ with ssu_col:
     agreement = get_accuracy(st.session_state["analysis_ssu"])
 
     agreed_percent, agreed_class = agreed
-    agreed_percent = f"{agreed_percent:.02f}%"
+    agreed_percent = f"{(agreed_percent * 100):.02f}%"
     confused_percent, confused_str = confused
-    confused_percent = f"-{confused_percent:.02f}%"
+    confused_percent = f"-{(confused_percent*100):.02f}%"
     st.header("SSU Summary")
-    st.metric("Agreement", f"{agreement:.02f}%")
+    st.metric("Agreement", f"{(agreement*100):.02f}%")
     st.metric(
         "Most agreed landcover class",
         agreed_class,
