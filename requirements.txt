@@ -9,3 +9,4 @@ folium
 ipyleaflet
 earthengine-api
 leafmap
+go_utils
