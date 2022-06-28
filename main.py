@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import ee
 from functools import partial
-
+from matplotlib.patches import Rectangle as MPLRect
 import math
 import geemap.foliumap as geemap
 from sklearn.metrics import confusion_matrix
@@ -226,31 +226,69 @@ def generate_confusion_matrix(df):
         df["harmonized_ceo"],
         df["harmonized_wc"],
         labels=harmonized_classes,
-        normalize="pred",
     )
+
+    user_total = []
+
+    for row in cf_matrix:
+        user_total.append(np.sum(row))
+
+    producer_total = []
+
+    for col in cf_matrix.T:
+        producer_total.append(np.sum(col))
 
     agreement = []
     for i, row in enumerate(cf_matrix):
-        agreement.append((row[i], harmonized_classes[i]))
-    confusion = []
+        agreement.append((row[i] / producer_total[i], harmonized_classes[i]))
 
+    confusion = []
     for i, row in enumerate(cf_matrix):
         for j, col in enumerate(row):
             if j == i:
                 continue
             else:
-                confusion.append((col, (harmonized_classes[i], harmonized_classes[j])))
-    agreed_tuple = max(agreement)
-    percent_confused, confused_values = max((confusion))
+                percent_error = (
+                    col / producer_total[j] if producer_total[j] > 0.0 else 0.0
+                )
+                confusion.append((percent_error, col, (i, j)))
+
+    producer_total = np.array(producer_total, dtype="float64")
+    # (np.sum(producer_total))
+    producer_total /= np.sum(producer_total)
+    user_total = np.array(user_total, dtype="float64")
+    user_total /= np.sum(user_total)
+
+    agreed_tuple = max(agreement)  # Sorted by percent error and then by raw error
+    number_confused, _, confused_values = max((confusion))
     ceo, wc = confused_values
-    confused_str = f"{ceo} for {wc}"
-    confused_tuple = (percent_confused, confused_str)
+    confused_str = f"{harmonized_classes[ceo]} for {harmonized_classes[wc]}"
+    confused_tuple = (number_confused, confused_str)
+    cf_matrix = confusion_matrix(
+        df["harmonized_ceo"],
+        df["harmonized_wc"],
+        labels=harmonized_classes,
+        normalize="pred",
+    )
+    cf_matrix = np.append(cf_matrix, np.array([user_total]).T, axis=1)
+    producer_total = np.append(producer_total, np.sum(producer_total))
+    cf_matrix = np.append(cf_matrix, [producer_total], axis=0)
 
     fig, ax = plt.subplots(figsize=(20, 10))
-    sns.heatmap(cf_matrix, annot=True, cmap="Blues")
-    ax.xaxis.set_ticklabels(harmonized_classes)
-    ax.yaxis.set_ticklabels(harmonized_classes)
+    mask = np.zeros(cf_matrix.shape)
+    mask[-1:] = True
+    mask[:, -1:] = True
+
+    sns.heatmap(cf_matrix, mask=mask, cmap="Blues", linewidths=0.25, linecolor="black")
+    sns.heatmap(cf_matrix, alpha=0, cbar=False, annot=True, annot_kws={"color": "k"})
+    for i in range(len(harmonized_classes)):
+        ax.add_patch(MPLRect((i, i), 1, 1, fill=False, edgecolor="black", lw=3))
+    ax.add_patch(MPLRect((wc, ceo), 1, 1, fill=False, edgecolor="red", lw=3))
+    ax.yaxis.set_ticklabels(harmonized_classes + ["WC Percentage"])
+    ax.xaxis.set_ticks_position("top")
+    ax.xaxis.set_ticklabels(harmonized_classes + ["User Percentage"])
     ax.set_xlabel("\nWorld Cover")
+    ax.xaxis.set_label_position("top")
     ax.set_ylabel("Collect Earth Online ")
 
     return fig, agreed_tuple, confused_tuple
@@ -428,6 +466,8 @@ with ssu_col:
     agreement = get_accuracy(st.session_state["analysis_ssu"])
 
     agreed_percent, agreed_class = agreed
+    ssu_amount = 3600 if plotid == entire_aoi_option else 100
+
     agreed_percent = f"{(agreed_percent * 100):.02f}%"
     confused_percent, confused_str = confused
     confused_percent = f"-{(confused_percent*100):.02f}%"
@@ -440,7 +480,7 @@ with ssu_col:
         delta_color="off",
     )
     st.metric(
-        "Most confused landcover class",
+        "Most confused landcover class (Collect Earth Classification for Worldcover Prediction)",
         confused_str,
         delta=confused_percent,
         delta_color="off",
