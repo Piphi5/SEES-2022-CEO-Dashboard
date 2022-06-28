@@ -568,6 +568,7 @@ with st.sidebar:
 
     selected_psu_data = convert_df(st.session_state["selected_psu"])
     selected_ssu_data = convert_df(st.session_state["selected_ssu"])
+    analysis_ssu_data = convert_df(st.session_state["analysis_ssu"])
     st.download_button(
         label="Download Primary Sampling Unit CSV",
         data=selected_psu_data,
@@ -578,5 +579,12 @@ with st.sidebar:
         label="Download Secondary Sampling Unit CSV",
         data=selected_ssu_data,
         file_name=f"CEO SSU-{aoi}.csv",
+        mime="text/csv",
+    )
+
+    st.download_button(
+        label="Download Enriched Secondary Sampling Unit Data",
+        data=selected_ssu_data,
+        file_name=f"CEO Enriched SSU-{aoi}.csv",
         mime="text/csv",
     )
