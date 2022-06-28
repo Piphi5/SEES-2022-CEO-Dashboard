@@ -296,10 +296,8 @@ def in_bounding_box(ne, sw, lat, lon):
     return min_lat <= lat <= max_lat and min_lon <= lon <= max_lon
 
 
-def get_globe_photos(lc_df, psu_data, plotid):
-    lat, lon = psu_data[psu_data["plotid"] == plotid].iloc[0][
-        ["center_lat", "center_lon"]
-    ]
+def get_globe_photos(lc_df, lat, lon):
+
     lat_const, lon_const = get_latlon_spacing_constants(50, lat)
     ne = (lat + lat_const, lon + lon_const)
     sw = (lat - lat_const, lon - lon_const)
@@ -323,6 +321,19 @@ def get_globe_photos(lc_df, psu_data, plotid):
         if not pd.isna(url) and "https" in url
     ]
     return cleaned_urls, intersected_entry[["lc_Latitude", "lc_Longitude"]]
+
+
+def display_latlon_coords(center_lat, center_lon, chip_size):
+    with st.expander("View Coordinates for External Enrichment"):
+        st.subheader("Link to Time Series explorer")
+        link = f"https://jstnbraaten.users.earthengine.app/view/landsat-timeseries-explorer#run=true;lon={center_lon};lat={center_lat};from=06-10;to=09-20;index=NBR;rgb=SWIR1%2FNIR%2FGREEN;chipwidth={chip_size};"
+        st.markdown(f"[Link to Time Series Explorer]({link})")
+        st.subheader("Plot Center Coords (Latitude, Longitude):")
+        st.code(f"{center_lat}, {center_lon}")
+        st.subheader("Plot Center Coords (Latitude):")
+        st.code(f"{center_lat}")
+        st.subheader("Plot Center Coords (Longitude):")
+        st.code(f"{center_lon}")
 
 
 @st.cache
@@ -447,12 +458,17 @@ with ssu_col:
         name="World Cover",
     )
     if plotid != entire_aoi_option:
+        center_lat, center_lon = st.session_state["selected_psu"][
+            st.session_state["selected_psu"]["plotid"] == plotid
+        ].iloc[0][["center_lat", "center_lon"]]
+        display_latlon_coords(center_lat, center_lon, 0.1)
+
         if st.button("Find nearby GLOBE Pictures"):
             with st.expander("View pictures"):
                 photo_list, coords = get_globe_photos(
                     st.session_state["lc_data"],
-                    st.session_state["selected_psu"],
-                    plotid,
+                    center_lat,
+                    center_lon,
                 )
                 if len(photo_list) != 0:
                     lc_lat, lc_lon = coords
@@ -500,6 +516,11 @@ with ssu_col:
 
         Map.addLayerControl()
         Map.to_streamlit(height=750)
+    else:
+        center_lat, center_lon = st.session_state["selected_psu"][
+            st.session_state["selected_psu"]["plotid"] == aoi * 100
+        ].iloc[0][["center_lat", "center_lon"]]
+        display_latlon_coords(center_lat, center_lon, 3.5)
 
 
 with st.sidebar:
