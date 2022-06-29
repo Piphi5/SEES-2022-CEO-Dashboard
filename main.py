@@ -239,8 +239,10 @@ def generate_confusion_matrix(df):
 
     agreement = []
     for i, row in enumerate(cf_matrix):
-        agreement.append((row[i] / producer_total[i], harmonized_classes[i]))
-
+        if producer_total[i] > 0:
+            agreement.append((row[i] / producer_total[i], harmonized_classes[i]))
+        else:
+            agreement.append((0, harmonized_classes[i]))
     confusion = []
     for i, row in enumerate(cf_matrix):
         for j, col in enumerate(row):
