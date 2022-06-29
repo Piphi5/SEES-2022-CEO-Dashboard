@@ -10,4 +10,4 @@ ipyleaflet
 earthengine-api
 leafmap
 go_utils
-sklearn
+scikit-learn
