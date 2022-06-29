@@ -112,7 +112,7 @@ wc_id_classification_map = {
 }
 
 
-@st.cache
+@st.cache(ttl=3600)
 def get_data(data_type):
     gis = GIS()
     item = gis.content.get(itemid=item_id_dict[data_type])
@@ -219,7 +219,6 @@ def enrich_ceo_data(df, image):
     return combined[
         (combined["harmonized_ceo"] != "") & (combined["harmonized_wc"] != "")
     ]
-
 
 def generate_confusion_matrix(df):
     cf_matrix = confusion_matrix(
@@ -379,6 +378,10 @@ def convert_df(df):
     # IMPORTANT: Cache the conversion to prevent computation on every rerun
     return df.to_csv().encode("utf-8")
 
+@st.cache
+def get_lc_data(ttl=3600):
+    return go_utils.get_api_data(landcover_protocol)
+
 
 if "psu_data" not in st.session_state:
     st.session_state["psu_data"] = get_data("psu")
@@ -391,7 +394,7 @@ if "selected_ssu" not in st.session_state:
 if "analysis_ssu" not in st.session_state:
     st.session_state["analysis_ssu"] = pd.DataFrame()
 if "lc_data" not in st.session_state:
-    st.session_state["lc_data"] = go_utils.get_api_data(landcover_protocol)
+    st.session_state["lc_data"] = get_lc_data()
 
 
 entire_aoi_option = "Analyze entire AOI"
