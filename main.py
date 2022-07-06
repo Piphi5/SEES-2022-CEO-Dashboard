@@ -220,6 +220,7 @@ def enrich_ceo_data(df, image):
         (combined["harmonized_ceo"] != "") & (combined["harmonized_wc"] != "")
     ]
 
+
 def generate_confusion_matrix(df):
     cf_matrix = confusion_matrix(
         df["harmonized_ceo"],
@@ -379,6 +380,7 @@ def display_latlon_coords(center_lat, center_lon, chip_size):
 def convert_df(df):
     # IMPORTANT: Cache the conversion to prevent computation on every rerun
     return df.to_csv().encode("utf-8")
+
 
 @st.cache
 def get_lc_data(ttl=3600):
