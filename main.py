@@ -396,7 +396,7 @@ if "selected_ssu" not in st.session_state:
 if "analysis_ssu" not in st.session_state:
     st.session_state["analysis_ssu"] = pd.DataFrame()
 if "lc_data" not in st.session_state:
-    st.session_state["lc_data"] = get_lc_data()
+    st.session_state["lc_data"] = get_lc_data().copy()
 
 
 entire_aoi_option = "Analyze entire AOI"
