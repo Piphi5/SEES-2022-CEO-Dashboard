@@ -323,7 +323,8 @@ sentinel_vis = {
     "max": 0.3,
     "bands": ["B4_median", "B3_median", "B2_median"],
 }
-world_cover = ee.ImageCollection("ESA/WorldCover/v100").first()
+world_cover_2020 = ee.ImageCollection("ESA/WorldCover/v100").first()
+world_cover_2021 = ee.ImageCollection("ESA/WorldCover/v200").first()
 harmonized_wc_vis = [
     harmonized_classes_vis[wc_to_harmonized_lookup[classification]]
     for classification in wc_to_harmonized_lookup.keys()
@@ -462,112 +463,174 @@ with psu_col:
     st.pyplot(fig)
 
 with ssu_col:
+    analysis_year = st.selectbox("Choose your ploid", [2020, 2021, "Both"])
+    if analysis_year != "Both":
+        if analysis_year == 2020:
+            world_cover_image = world_cover_2020
+        else:
+            world_cover_image = world_cover_2021
+        st.session_state["analysis_ssu"] = enrich_ceo_data(
+            st.session_state["analysis_ssu"], world_cover_image
+        )
+        cf_fig, agreed, confused = generate_confusion_matrix(
+            st.session_state["analysis_ssu"]
+        )
 
-    st.session_state["analysis_ssu"] = enrich_ceo_data(
-        st.session_state["analysis_ssu"], world_cover
-    )
-    cf_fig, agreed, confused = generate_confusion_matrix(
-        st.session_state["analysis_ssu"]
-    )
+        agreement = get_accuracy(st.session_state["analysis_ssu"])
 
-    agreement = get_accuracy(st.session_state["analysis_ssu"])
+        agreed_percent, agreed_class = agreed
+        ssu_amount = 3600 if plotid == entire_aoi_option else 100
 
-    agreed_percent, agreed_class = agreed
-    ssu_amount = 3600 if plotid == entire_aoi_option else 100
+        agreed_percent = f"{(agreed_percent * 100):.02f}%"
+        confused_percent, confused_str = confused
+        confused_percent = f"-{(confused_percent*100):.02f}%"
+        st.header("SSU Summary")
+        st.metric("Agreement", f"{(agreement*100):.02f}%")
+        st.metric(
+            "Most agreed landcover class",
+            agreed_class,
+            delta=agreed_percent,
+            delta_color="off",
+        )
+        st.metric(
+            "Most confused landcover class (Collect Earth Classification for Worldcover Prediction)",
+            confused_str,
+            delta=confused_percent,
+            delta_color="off",
+        )
 
-    agreed_percent = f"{(agreed_percent * 100):.02f}%"
-    confused_percent, confused_str = confused
-    confused_percent = f"-{(confused_percent*100):.02f}%"
-    st.header("SSU Summary")
-    st.metric("Agreement", f"{(agreement*100):.02f}%")
-    st.metric(
-        "Most agreed landcover class",
-        agreed_class,
-        delta=agreed_percent,
-        delta_color="off",
-    )
-    st.metric(
-        "Most confused landcover class (Collect Earth Classification for Worldcover Prediction)",
-        confused_str,
-        delta=confused_percent,
-        delta_color="off",
-    )
+        st.pyplot(cf_fig)
 
-    st.pyplot(cf_fig)
+        # Map.add_legend(title="ESA Land Cover", builtin_legend="ESA_WorldCover")
+        Map.add_legend(legend_dict=harmonized_classes_vis)
+        Map.add_basemap("SATELLITE")
+        Map.addLayer(sentinel_image, sentinel_vis, "Sentinel View")
+        Map.addLayer(
+            world_cover_image,
+            vis_params={"min": 10, "max": 100, "palette": harmonized_wc_vis},
+            name="World Cover",
+        )
+        if plotid != entire_aoi_option:
+            center_lat, center_lon = st.session_state["selected_psu"][
+                st.session_state["selected_psu"]["plotid"] == plotid
+            ].iloc[0][["center_lat", "center_lon"]]
+            display_latlon_coords(center_lat, center_lon, 0.1)
 
-    # Map.add_legend(title="ESA Land Cover", builtin_legend="ESA_WorldCover")
-    Map.add_legend(legend_dict=harmonized_classes_vis)
-    Map.add_basemap("SATELLITE")
-    Map.addLayer(sentinel_image, sentinel_vis, "Sentinel View")
-    Map.addLayer(
-        world_cover,
-        vis_params={"min": 10, "max": 100, "palette": harmonized_wc_vis},
-        name="World Cover",
-    )
-    if plotid != entire_aoi_option:
-        center_lat, center_lon = st.session_state["selected_psu"][
-            st.session_state["selected_psu"]["plotid"] == plotid
-        ].iloc[0][["center_lat", "center_lon"]]
-        display_latlon_coords(center_lat, center_lon, 0.1)
+            if st.button("Find nearby GLOBE Pictures"):
+                with st.expander("View pictures"):
+                    photo_list, coords = get_globe_photos(
+                        st.session_state["lc_data"],
+                        center_lat,
+                        center_lon,
+                    )
+                    if len(photo_list) != 0:
+                        lc_lat, lc_lon = coords
+                        point = folium.FeatureGroup(name="GLOBE Observation")
+                        folium.CircleMarker(
+                            location=(lc_lat, lc_lon),
+                            name="GLOBE Observation",
+                            radius=10,
+                            color="#000000",
+                            fill_color="white",
+                        ).add_to(point)
+                        point.add_to(Map)
+                        for photo in photo_list:
+                            url, direction = photo
+                            st.text(
+                                direction.replace("lc_", "").replace("PhotoUrl", "")
+                            )
+                            st.image(url)
+                    else:
+                        st.write("No images found.")
 
-        if st.button("Find nearby GLOBE Pictures"):
-            with st.expander("View pictures"):
-                photo_list, coords = get_globe_photos(
-                    st.session_state["lc_data"],
-                    center_lat,
-                    center_lon,
-                )
-                if len(photo_list) != 0:
-                    lc_lat, lc_lon = coords
-                    point = folium.FeatureGroup(name="GLOBE Observation")
-                    folium.CircleMarker(
-                        location=(lc_lat, lc_lon),
-                        name="GLOBE Observation",
-                        radius=10,
-                        color="#000000",
-                        fill_color="white",
-                    ).add_to(point)
-                    point.add_to(Map)
-                    for photo in photo_list:
-                        url, direction = photo
-                        st.text(direction.replace("lc_", "").replace("PhotoUrl", ""))
-                        st.image(url)
-                else:
-                    st.write("No images found.")
+            x = []
+            y = []
+            grid = folium.FeatureGroup(name="100m Grid")
+            for _, data in st.session_state["analysis_ssu"][
+                st.session_state["analysis_ssu"]["plotid"] == plotid
+            ].iterrows():
+                lat_const, lon_const = get_latlon_spacing_constants(4.0, data["lat"])
+                sw = (data["lat"] - lat_const, data["lon"] - lon_const)
+                ne = (data["lat"] + lat_const, data["lon"] + lon_const)
+                bounds = [sw, ne]
+                y.extend([sw[0], ne[0]])
+                x.extend([sw[1], ne[1]])
+                folium.Rectangle(
+                    bounds=bounds,
+                    fill=True,
+                    color="#000000",
+                    fill_color=harmonized_classes_vis[data["harmonized_ceo"]],
+                    fill_opacity=0.75,
+                ).add_to(grid)
 
-        x = []
-        y = []
-        grid = folium.FeatureGroup(name="100m Grid")
-        for _, data in st.session_state["analysis_ssu"][
-            st.session_state["analysis_ssu"]["plotid"] == plotid
-        ].iterrows():
-            lat_const, lon_const = get_latlon_spacing_constants(4.0, data["lat"])
-            sw = (data["lat"] - lat_const, data["lon"] - lon_const)
-            ne = (data["lat"] + lat_const, data["lon"] + lon_const)
-            bounds = [sw, ne]
-            y.extend([sw[0], ne[0]])
-            x.extend([sw[1], ne[1]])
-            folium.Rectangle(
-                bounds=bounds,
-                fill=True,
-                color="#000000",
-                fill_color=harmonized_classes_vis[data["harmonized_ceo"]],
-                fill_opacity=0.75,
-            ).add_to(grid)
+            centerlat = (min(y) + max(y)) / 2
+            centerlon = (min(x) + max(x)) / 2
 
-        centerlat = (min(y) + max(y)) / 2
-        centerlon = (min(x) + max(x)) / 2
+            Map.setCenter(centerlon, centerlat, zoom=19)
+            grid.add_to(Map)
 
-        Map.setCenter(centerlon, centerlat, zoom=19)
+            Map.addLayerControl()
+            Map.to_streamlit(height=750)
+        else:
+            center_lat, center_lon = st.session_state["selected_psu"][
+                st.session_state["selected_psu"]["plotid"] == aoi * 100
+            ].iloc[0][["center_lat", "center_lon"]]
+            display_latlon_coords(center_lat, center_lon, 3.5)
+    else:
+        df_2020 = enrich_ceo_data(st.session_state["analysis_ssu"], world_cover_2020)
+        df_2021 = enrich_ceo_data(st.session_state["analysis_ssu"], world_cover_2021)
+        count = np.count_nonzero(df_2020["harmonized_wc"].eq(df_2021["harmonized_wc"]))
+        st.metric(
+            "Agreed Land Cover Points Across 2020 and 2021",
+            count,
+        )
+        st.metric(
+            "Agreed Land Cover Percentage Across 2020 and 2021",
+            f"{count / len(df_2020)*100}%",
+        )
+
+        if plotid != entire_aoi_option:
+            zoom = 19
+            center_lat, center_lon = st.session_state["selected_psu"][
+                st.session_state["selected_psu"]["plotid"] == plotid
+            ].iloc[0][["center_lat", "center_lon"]]
+        else:
+            zoom = 14
+            center_lat, center_lon = st.session_state["selected_psu"][
+                st.session_state["selected_psu"]["plotid"] == aoi * 100
+            ].iloc[0][["center_lat", "center_lon"]]
+
+        grid = folium.FeatureGroup(name="AOI")
+        ne = (
+            max(st.session_state["analysis_ssu"]["lat"]),
+            max(st.session_state["analysis_ssu"]["lon"]),
+        )
+        sw = (
+            min(st.session_state["analysis_ssu"]["lat"]),
+            min(st.session_state["analysis_ssu"]["lon"]),
+        )
+        folium.Rectangle(
+            bounds=[sw, ne],
+            fill=True,
+            color="#000000",
+            fill_opacity=0,
+        ).add_to(grid)
+        Map.add_basemap("SATELLITE")
+        Map.addLayer(sentinel_image, sentinel_vis, "Sentinel View")
+        Map.addLayer(
+            world_cover_2020,
+            vis_params={"min": 10, "max": 100, "palette": harmonized_wc_vis},
+            name="World Cover 2020",
+        )
+        Map.addLayer(
+            world_cover_2021,
+            vis_params={"min": 10, "max": 100, "palette": harmonized_wc_vis},
+            name="World Cover 2021",
+        )
         grid.add_to(Map)
-
+        Map.setCenter(center_lon, center_lat, zoom=zoom)
         Map.addLayerControl()
         Map.to_streamlit(height=750)
-    else:
-        center_lat, center_lon = st.session_state["selected_psu"][
-            st.session_state["selected_psu"]["plotid"] == aoi * 100
-        ].iloc[0][["center_lat", "center_lon"]]
-        display_latlon_coords(center_lat, center_lon, 3.5)
 
 
 with st.sidebar:
